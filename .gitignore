@@ -1,0 +1,30 @@
+# Secrets
+**/.env
+**/.env.*
+**/*secret*
+**/*secrets*
+**/*key*
+**/*keys*
+**/credentials
+**/config
+**/aws-credentials*
+**/access_key*
+**/access-key*
+**/id_rsa*
+**/*.pem
+
+# AWS / local
+.aws/
+*.pem
+s3-policy.json
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+
+
+# Python
+__pycache__/
+*.pyc
+*.zip
+backend/package/

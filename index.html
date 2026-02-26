@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaveShift</title>
+    <link rel="stylesheet" href="frontend/style.css">
+</head>
+
+<body>
+
+    <!-- Header Persistente -->
+    <header class="app-header">
+        <div class="header-content">
+            <div class="brand">
+                <svg class="audio-wave-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+                <span class="brand-name">WaveShift</span>
+            </div>
+            <div class="user-menu-container" id="userMenuContainer">
+                <button class="profile-btn" id="profileBtn" aria-label="Menu Profilo">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="profile-icon">
+                        <path
+                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                </button>
+                <!-- Dropdown Menu -->
+                <div class="profile-dropdown hidden" id="profileDropdown">
+                    <div class="dropdown-header">
+                        <span id="dropdown-username" class="dropdown-user">User</span>
+                        <button class="edit-btn-small" id="btnEditUsername" title="Modifica Username">✎</button>
+                    </div>
+                    <div class="dropdown-item email-item">
+                        <span class="label">Email</span>
+                        <span id="dropdown-email" class="value">user@example.com</span>
+                    </div>
+                    <div class="dropdown-item">
+                        <span class="label">Password</span>
+                        <span class="value">••••••••</span>
+                        <button class="link-btn" id="btnChangePassword">Modifica</button>
+                    </div>
+                    <hr>
+                    <button class="dropdown-action danger" id="btnDeleteAccount">Elimina Account</button>
+                    <button class="dropdown-action danger" id="btnLogout">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-container">
+
+        <!-- VIEW: AUTH (Sign In / Sign Up) -->
+        <section id="view-auth" class="view-section">
+            <div class="auth-card">
+                <div class="auth-tabs">
+                    <button class="tab-btn active" data-tab="signin">Sign In</button>
+                    <button class="tab-btn" data-tab="signup">Sign Up</button>
+                </div>
+
+                <!-- Sign In Form -->
+                <div id="tab-signin" class="auth-form-container">
+                    <form id="form-signin">
+                        <div class="form-group">
+                            <label for="signin-email">Email</label>
+                            <input type="email" id="signin-email" required placeholder="tuamail@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="signin-password">Password</label>
+                            <input type="password" id="signin-password" required placeholder="••••••••">
+                        </div>
+                        <div class="form-actions">
+                            <a href="#" id="link-forgot-password" class="forgot-link">Password dimenticata?</a>
+                            <button type="submit" class="btn-primary">Accedi</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Sign Up Form -->
+                <div id="tab-signup" class="auth-form-container hidden">
+                    <form id="form-signup">
+                        <div class="form-group">
+                            <label for="signup-email">Email</label>
+                            <input type="email" id="signup-email" required placeholder="tuamail@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-username">Username</label>
+                            <input type="text" id="signup-username" required placeholder="Come vuoi chiamarti?">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-password">Password</label>
+                            <input type="password" id="signup-password" required placeholder="Inserisci Password">
+                            <small class="password-rules">Policy: 8+ caratteri, 1 Maiuscola, 1 Numero, 1
+                                Speciale.</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Crea Account</button>
+                        </div>
+                    </form>
+                </div>
+                <div id="auth-message" class="message-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- VIEW: FORGOT PASSWORD -->
+        <section id="view-forgot-password" class="view-section hidden">
+            <div class="auth-card">
+                <h3>Recupero Password</h3>
+                <p class="subtext">Inserisci la tua email per ricevere il codice di reset.</p>
+
+                <!-- Step 1: Request Code -->
+                <form id="form-forgot-request">
+                    <div class="form-group">
+                        <label for="forgot-email">Email</label>
+                        <input type="email" id="forgot-email" required placeholder="tuamail@example.com">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="btn-back-to-auth" class="btn-secondary">Indietro</button>
+                        <button type="submit" class="btn-primary">Invia Codice</button>
+                    </div>
+                </form>
+
+                <!-- Step 2: Reset Password (inizialmente nascosto) -->
+                <form id="form-forgot-reset" class="hidden">
+                    <div class="form-group">
+                        <label for="reset-code">Codice di conferma</label>
+                        <input type="text" id="reset-code" required placeholder="123456">
+                    </div>
+                    <div class="form-group">
+                        <label for="reset-new-password">Nuova Password</label>
+                        <input type="password" id="reset-new-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reset-confirm-password">Conferma Password</label>
+                        <input type="password" id="reset-confirm-password" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Cambia Password</button>
+                    </div>
+                </form>
+                <div id="forgot-message" class="message-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- VIEW: CONFIRM EMAIL (OTP) -->
+        <section id="view-confirm" class="view-section hidden">
+            <div class="auth-card">
+                <h3>Conferma Email</h3>
+                <p class="subtext">Abbiamo inviato un codice a <span id="confirm-email-display">tua email</span>.</p>
+                <form id="form-confirm-code">
+                    <div class="form-group">
+                        <label for="otp-code">Codice OTP</label>
+                        <input type="text" id="otp-code" required placeholder="123456" maxlength="6">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Conferma</button>
+                    </div>
+                </form>
+                <div class="resend-container">
+                    <button id="btn-resend-code" class="link-btn">Invia nuovo codice</button>
+                    <span id="resend-timer" class="timer hidden">(00:30)</span>
+                </div>
+                <div id="confirm-message" class="message-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- VIEW: DASHBOARD -->
+        <section id="view-dashboard" class="view-section hidden">
+            <div class="dashboard-header">
+                <h2>Ciao, <span id="dash-username">User</span>!</h2>
+                <p class="dashboard-subtitle">Converti i tuoi file audio in pochi secondi.</p>
+            </div>
+
+            <!-- Sezione Come Funziona -->
+            <div class="how-it-works">
+                <div class="step-card">
+                    <div class="step-icon">📁</div>
+                    <div class="step-number">1</div>
+                    <h4>Carica</h4>
+                    <p>Trascina o seleziona il tuo file audio (max 50 MB)</p>
+                </div>
+                <div class="step-arrow">→</div>
+                <div class="step-card">
+                    <div class="step-icon">⚡</div>
+                    <div class="step-number">2</div>
+                    <h4>Converti</h4>
+                    <p>Scegli il formato di output e avvia la conversione</p>
+                </div>
+                <div class="step-arrow">→</div>
+                <div class="step-card">
+                    <div class="step-icon">⬇️</div>
+                    <div class="step-number">3</div>
+                    <h4>Scarica</h4>
+                    <p>Il file convertito è pronto in pochi istanti</p>
+                </div>
+            </div>
+
+            <div class="converter-card">
+                <!-- Step 1: Selection -->
+                <div class="conversion-steps">
+                    <div class="step-group">
+                        <label>Input Format</label>
+                        <select id="input-format">
+                            <option value="wav">WAV</option>
+                            <option value="mp3">MP3</option>
+                            <option value="m4a">M4A</option>
+                            <option value="ogg">OGG</option>
+                        </select>
+                    </div>
+                    <div class="arrow-icon">➔</div>
+                    <div class="step-group">
+                        <label>Output Format</label>
+                        <select id="output-format">
+                            <option value="mp3">MP3</option>
+                            <option value="wav">WAV</option>
+                            <option value="m4a">M4A</option>
+                            <option value="ogg">OGG</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step 2: Upload Area -->
+                <div class="upload-area disabled" id="upload-dropzone">
+                    <div class="upload-placeholder">
+                        <svg viewBox="0 0 24 24" class="upload-icon">
+                            <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                        </svg>
+                        <p>Trascina il file qui o</p>
+                        <button class="btn-outline" id="btn-browse">Scegli File</button>
+                        <input type="file" id="audio-file" accept="audio/*" hidden>
+                    </div>
+                    <div class="file-info hidden" id="file-info-display">
+                        <span class="filename">me_singing.wav</span>
+                        <span class="filesize">(12 MB)</span>
+                        <button class="btn-clear" id="btn-clear-file">✕</button>
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button id="btn-convert" class="btn-primary full-width" disabled>Converti</button>
+                </div>
+
+                <!-- Progress & Result -->
+                <div id="conversion-status" class="status-box hidden">
+                    <!-- Progress State -->
+                    <div id="progress-state" class="hidden">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-indeterminate"></div>
+                        </div>
+                        <p class="status-text">Conversione in corso...</p>
+                    </div>
+
+                    <!-- Success State -->
+                    <div id="success-state" class="hidden">
+                        <p class="success-msg">Conversione completata!</p>
+                        <div class="download-actions">
+                            <button id="btn-download" class="btn-dl btn-dl-file"> Scarica File</button>
+                            <button id="btn-download-report" class="btn-dl btn-dl-report"> Scarica Report</button>
+                        </div>
+
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="error-state" class="hidden">
+                        <p class="error-msg">Errore durante la conversione.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informative Cards -->
+            <div class="info-grid">
+                <div class="info-card fmt-card fmt-wav">
+                    <div class="fmt-icon">🎚️</div>
+                    <h4>WAV</h4>
+                    <p>Alta qualità, non compresso. Ideale per editing professionale.</p>
+                </div>
+                <div class="info-card fmt-card fmt-mp3">
+                    <div class="fmt-icon">🎵</div>
+                    <h4>MP3</h4>
+                    <p>Standard universale, compresso (lossy). Ottimo per condivisione.</p>
+                </div>
+                <div class="info-card fmt-card fmt-m4a">
+                    <div class="fmt-icon">🍎</div>
+                    <h4>M4A (AAC)</h4>
+                    <p>Ottimizzato per Apple/Mobile. Qualità superiore a MP3 a parità di peso.</p>
+                </div>
+                <div class="info-card fmt-card fmt-ogg">
+                    <div class="fmt-icon">🌐</div>
+                    <h4>OGG</h4>
+                    <p>Formato open. Efficiente per streaming e applicazioni web.</p>
+                </div>
+                <div class="info-card limit-card">
+                    <div class="fmt-icon">⚠️</div>
+                    <h4>Limiti</h4>
+                    <p>Dimensione massima: <strong>50 MB</strong>.</p>
+                </div>
+            </div>
+            <!-- FAQ Section -->
+            <div class="faq-section">
+                <h3 class="faq-title">Domande frequenti</h3>
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <h4>Quali formati sono supportati?</h4>
+                        <p>WaveShift supporta i formati più diffusi: WAV, MP3, M4A e OGG. Puoi convertire da e verso
+                            qualsiasi combinazione di questi formati.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>Qual è la dimensione massima del file?</h4>
+                        <p>Puoi caricare file fino a <strong>50 MB</strong>. Per file più grandi ti consigliamo di
+                            comprimerli prima della conversione.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>I miei file vengono conservati?</h4>
+                        <p>No. I file vengono eliminati automaticamente dai nostri server dopo la conversione. La tua
+                            privacy è garantita.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>La conversione è sicura?</h4>
+                        <p>Sì. Tutte le comunicazioni sono cifrate e i tuoi file non sono accessibili ad altri utenti in
+                            nessun momento.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>Quanto tempo richiede una conversione?</h4>
+                        <p>Dipende dalla dimensione del file, ma nella maggior parte dei casi la conversione si completa
+                            in pochi secondi.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>Ho bisogno di un account?</h4>
+                        <p>Sì, WaveShift richiede una registrazione gratuita per garantire sicurezza e tracciabilità
+                            delle conversioni.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal Change Password (Global/Overlay) -->
+        <div id="modal-change-password" class="modal-overlay hidden">
+            <div class="modal">
+                <h3>Cambia Password</h3>
+                <form id="form-change-pass">
+                    <div class="form-group">
+                        <label>Password Attuale</label>
+                        <input type="password" id="cp-current" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nuova Password</label>
+                        <input type="password" id="cp-new" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Conferma Nuova Password</label>
+                        <input type="password" id="cp-confirm" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="btn-close-cp-modal">Annulla</button>
+                        <button type="submit" class="btn-primary">Salva</button>
+                    </div>
+                </form>
+            </div>
+            <div id="cp-message" class="message-box hidden"></div>
+        </div>
+
+    </main>
+
+    <!-- Script -->
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+    <script src="frontend/config.js"></script>
+    <script src="frontend/app.js"></script>
+
+</body>
+
+</html>

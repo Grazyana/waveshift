@@ -1,0 +1,140 @@
+name: Deploy WaveShift
+run-name: Full Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  PROJECT_NAME: waveshift
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Delete existing CloudWatch Log Groups
+        run: |
+          aws logs delete-log-group --log-group-name /aws/lambda/waveshift-api 2>/dev/null || true
+          aws logs delete-log-group --log-group-name /ecs/waveshift-worker 2>/dev/null || true
+
+      # 1. INFRASTRUTTURA - CloudFormation
+
+      - name: Deploy Network Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/network.yaml \
+            --stack-name ${{ env.PROJECT_NAME }}-network-dev \
+            --parameter-overrides ProjectName=${{ env.PROJECT_NAME }} \
+            --no-fail-on-empty-changeset
+
+      # 2. FRONTEND - Deploy su S3 + CloudFront (prima del backend per avere il dominio)
+
+      - name: Deploy Frontend Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file frontend/frontend.yaml \
+            --stack-name ${{ env.PROJECT_NAME }}-frontend-dev \
+            --parameter-overrides BucketName=${{ env.PROJECT_NAME }}-frontend-dev \
+            --no-fail-on-empty-changeset
+
+      - name: Get CloudFront Domain
+        id: cloudfront
+        run: |
+          CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDomain'].OutputValue" \
+            --output text)
+          echo "domain=$CLOUDFRONT_DOMAIN" >> $GITHUB_OUTPUT
+
+      - name: Deploy App Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/app.yaml \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides ProjectName=${{ env.PROJECT_NAME }} CloudFrontDomain=${{ steps.cloudfront.outputs.domain }} \
+            --no-fail-on-empty-changeset
+
+      # 3. CONVERTER - Docker build & push su ECR + aggiorna ECS
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          ECR_REPO=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='EcrRepoUri'].OutputValue" \
+            --output text)
+
+          docker build -t $ECR_REPO:${{ github.sha }} converter/
+          docker push $ECR_REPO:${{ github.sha }}
+
+      - name: Update ECS Service
+        run: |
+          CLUSTER_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='EcsClusterName'].OutputValue" \
+            --output text)
+
+          SERVICE_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='EcsServiceName'].OutputValue" \
+            --output text)
+
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment
+
+      # 4. LAMBDA - Package e deploy
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Package Lambda function
+        run: |
+          mkdir -p backend/package
+          cp backend/lambda_app.py backend/package/index.py
+          cd backend/package && zip -r ../lambda_package.zip .
+
+      - name: Deploy Lambda function
+        run: |
+          LAMBDA_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='LambdaFunctionName'].OutputValue" \
+            --output text)
+
+          aws lambda update-function-code \
+            --function-name $LAMBDA_NAME \
+            --zip-file fileb://backend/lambda_package.zip
+
+          aws lambda wait function-updated \
+            --function-name $LAMBDA_NAME
+
+      # 5. SYNC FRONTEND FILES to S3
+      
+      - name: Deploy Frontend Files to S3
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" \
+            --output text)
+          
+          aws s3 sync frontend/ s3://$BUCKET_NAME/ \
+            --delete \
+            --exclude "*.yaml"
+          aws s3 cp index.html s3://$BUCKET_NAME/index.html
