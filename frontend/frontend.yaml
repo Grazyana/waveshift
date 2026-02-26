@@ -35,6 +35,8 @@ Resources:
           - Id: s3origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
             OriginAccessControlId: !Ref OAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
         DefaultCacheBehavior:
           TargetOriginId: s3origin
           ViewerProtocolPolicy: redirect-to-https
