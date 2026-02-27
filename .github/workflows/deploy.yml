@@ -62,6 +62,30 @@ jobs:
             --output text)
           echo "distribution_id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
 
+      - name: Cleanup API Gateway log group if unmanaged
+        run: |
+          API_ID=$(aws apigateway get-rest-apis \
+            --query "items[?name=='waveshift-api'].id" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then
+            LOG_GROUP_NAME="API-Gateway-Execution-Logs_${API_ID}/prod"
+
+            # Verifica se il log group è già gestito da CloudFormation
+            LOG_IN_STACK=$(aws cloudformation list-stack-resources \
+              --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+              --query "StackResourceSummaries[?LogicalResourceId=='ApiGatewayLogGroup'].PhysicalResourceId" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -z "$LOG_IN_STACK" ] || [ "$LOG_IN_STACK" == "None" ]; then
+              aws logs delete-log-group \
+                --log-group-name "$LOG_GROUP_NAME" 2>/dev/null || true
+              echo "Log group $LOG_GROUP_NAME eliminato o non esistente"
+            else
+              echo "Log group già gestito da CloudFormation, nessuna azione necessaria"
+            fi
+          fi
+
       - name: Cleanup API Gateway stage if unmanaged
         run: |
           API_ID=$(aws apigateway get-rest-apis \
