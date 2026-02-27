@@ -94,51 +94,6 @@ jobs:
               --output text 2>/dev/null || echo "")"
           fi
 
-      - name: Cleanup API Gateway log group if unmanaged
-        run: |
-          API_ID=$(aws apigateway get-rest-apis \
-            --query "items[?name=='waveshift-api'].id" \
-            --output text 2>/dev/null || echo "")
-
-          if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then
-            LOG_GROUP_NAME="API-Gateway-Execution-Logs_${API_ID}/prod"
-
-            LOG_IN_STACK=$(aws cloudformation list-stack-resources \
-              --stack-name ${{ env.PROJECT_NAME }}-app-dev \
-              --query "StackResourceSummaries[?LogicalResourceId=='ApiGatewayLogGroup'].PhysicalResourceId" \
-              --output text 2>/dev/null || echo "")
-
-            if [ -z "$LOG_IN_STACK" ] || [ "$LOG_IN_STACK" == "None" ]; then
-              aws logs delete-log-group \
-                --log-group-name "$LOG_GROUP_NAME" 2>/dev/null || true
-              echo "Log group $LOG_GROUP_NAME eliminato o non esistente"
-            else
-              echo "Log group già gestito da CloudFormation, nessuna azione necessaria"
-            fi
-          fi
-
-      - name: Cleanup API Gateway stage if unmanaged
-        run: |
-          API_ID=$(aws apigateway get-rest-apis \
-            --query "items[?name=='waveshift-api'].id" \
-            --output text 2>/dev/null || echo "")
-
-          if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then
-            STAGE_IN_STACK=$(aws cloudformation list-stack-resources \
-              --stack-name ${{ env.PROJECT_NAME }}-app-dev \
-              --query "StackResourceSummaries[?LogicalResourceId=='ApiStage'].PhysicalResourceId" \
-              --output text 2>/dev/null || echo "")
-
-            if [ -z "$STAGE_IN_STACK" ] || [ "$STAGE_IN_STACK" == "None" ]; then
-              aws apigateway delete-stage \
-                --rest-api-id $API_ID \
-                --stage-name prod 2>/dev/null || true
-              echo "Stage prod eliminato o non esistente, CloudFormation lo ricreerà"
-            else
-              echo "Stage prod già gestito da CloudFormation, nessuna azione necessaria"
-            fi
-          fi
-
       - name: Deploy App Stack
         run: |
           aws cloudformation deploy \
@@ -147,6 +102,32 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides ProjectName=${{ env.PROJECT_NAME }} CloudFrontDomain=${{ steps.cloudfront.outputs.domain }} \
             --no-fail-on-empty-changeset
+
+      - name: Deploy API Gateway stage
+        run: |
+          API_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiId'].OutputValue" \
+            --output text)
+
+          # Crea un nuovo deployment
+          DEPLOYMENT_ID=$(aws apigateway create-deployment \
+            --rest-api-id $API_ID \
+            --description "Deploy from ${{ github.sha }}" \
+            --query "id" \
+            --output text)
+
+          # Crea o aggiorna lo stage prod
+          aws apigateway create-stage \
+            --rest-api-id $API_ID \
+            --stage-name prod \
+            --deployment-id $DEPLOYMENT_ID 2>/dev/null || \
+          aws apigateway update-stage \
+            --rest-api-id $API_ID \
+            --stage-name prod \
+            --patch-operations op=replace,path=/deploymentId,value=$DEPLOYMENT_ID
+
+          echo "Stage prod aggiornato con deployment $DEPLOYMENT_ID"
 
       # 3. CONVERTER - Docker build & push su ECR + aggiorna ECS
 

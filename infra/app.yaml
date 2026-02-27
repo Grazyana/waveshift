@@ -168,12 +168,6 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${LambdaFunction}
       RetentionInDays: 7
 
-  ApiGatewayLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "API-Gateway-Execution-Logs_${RestApi}/prod"
-      RetentionInDays: 7
-
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -317,28 +311,6 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations
-
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - JobsPostMethod
-      - JobsGetMethod
-      - DownloadGetMethod
-      - ConfirmPostMethod
-      - HealthGetMethod
-      - JobsOptionsMethod
-    Properties:
-      RestApiId: !Ref RestApi
-
-  # Stage esplicito: necessario perché l'URL /prod sia raggiungibile
-  ApiStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment
-      StageName: prod
-      AccessLogSetting:
-        DestinationArn: !GetAtt ApiGatewayLogGroup.Arn
 
   LambdaApiPermission:
     Type: AWS::Lambda::Permission
@@ -493,3 +465,5 @@ Outputs:
     Value: waveshift-service
   LambdaFunctionName:
     Value: !Ref LambdaFunction
+  ApiId:
+    Value: !Ref RestApi
