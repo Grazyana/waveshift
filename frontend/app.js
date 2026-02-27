@@ -774,6 +774,8 @@ async function startConversion() {
 }
 
 async function pollStatus(token) {
+    console.log("[DEBUG] Token:", token);
+    console.log("[DEBUG] URL:", `${CONFIG.API_BASE_URL}/jobs/${currentJobId}`);
     if (!currentJobId) return;
 
     try {
