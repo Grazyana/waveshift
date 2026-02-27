@@ -330,3 +330,14 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id ${{ steps.cloudfront.outputs.distribution_id }} \
             --paths "/*"
+
+      # 7. PRINT URL
+
+      - name: Print App URL
+        run: |
+          URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.PROJECT_NAME }}-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDomain'].OutputValue" \
+            --output text)
+          echo "### Deploy completato!" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** [https://$URL](https://$URL)" >> $GITHUB_STEP_SUMMARY
