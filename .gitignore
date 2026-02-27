@@ -28,3 +28,5 @@ __pycache__/
 *.pyc
 *.zip
 backend/package/
+
+app_phase1.yaml
