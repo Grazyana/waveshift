@@ -190,9 +190,6 @@ function checkSession() {
             loadUserAttributes();
             if (err) {
                 console.error("Cannot load attributes on session:", err);
-                // anche se non carica attributi, entra in dashboard:
-                // anche se non carica attributi, entra in dashboard:
-                // showView('dashboard');
                 showView('auth');
                 return;
             }
@@ -263,7 +260,6 @@ function handleSignIn(e) {
         },
 
         onSuccess: (result) => {
-            // Aggancia la sessione e poi carica attributi
             console.log("AUTH SUCCESS");
             cognitoUser.getSession((err, session) => {
                 console.log("GET SESSION CALLBACK", { err, valid: session?.isValid?.() });
@@ -285,21 +281,14 @@ function handleSignIn(e) {
         },
 
         newPasswordRequired: (userAttributes, requiredAttributes) => {
-            // Gestione del cambio password obbligatorio per utenti creati dall’amministratore
-            // Riutilizziamo la finestra di cambio password ma con una logica specifica
-            delete userAttributes.email_verified; // cleanup    
+            delete userAttributes.email_verified;
 
-            // Memorizza lo stato specifico della challenge
             cognitoUser.challengeName = 'NEW_PASSWORD_REQUIRED';
             cognitoUser.challengeAttributes = userAttributes;
 
-            // Mostra il modale, nasconde il campo "Password corrente" poiché non è necessario/utilizzato in questa chiamata API, 
-            // ma per semplicità in questa API specifica (completeNewPasswordChallenge) inviamo la nuova password.
-            // Il campo "Password corrente" dell'interfaccia utente è irrilevante qui.
-
             document.getElementById('modal-change-password').classList.remove('hidden');
-            document.getElementById('cp-current').parentElement.classList.add('hidden'); // Nasconde la password corrente
-            document.getElementById('cp-current').value = "DUMMY"; // Ignora il controllo di obbligatorietà se la validazione nativa è già corretta
+            document.getElementById('cp-current').parentElement.classList.add('hidden');
+            document.getElementById('cp-current').value = "DUMMY";
 
             setAuthMessage("È richiesta una nuova password al primo accesso.", 'error');
         }
@@ -320,7 +309,6 @@ function handleSignUp(e) {
     const attributeList = [
         new AmazonCognitoIdentity.CognitoUserAttribute({ Name: "email", Value: email }),
         new AmazonCognitoIdentity.CognitoUserAttribute({ Name: "preferred_username", Value: username })
-        // preferred_username è una claim standard OIDC che possiamo usare come nome visualizzato
     ];
 
     userPool.signUp(email, password, attributeList, null, (err, result) => {
@@ -329,11 +317,9 @@ function handleSignUp(e) {
             return;
         }
 
-        // Success
-        tempUsername = email; // Cognito usa spesso l’email come username, oppure si può usare result.user.getUsername()
+        tempUsername = email;
         document.getElementById('confirm-email-display').textContent = email;
 
-        // Imposta timer per il reinvio
         initResendTimer();
 
         showView('confirm');
@@ -358,7 +344,6 @@ function handleConfirmCode(e) {
             return;
         }
 
-        // Account confermato → auto-login
         const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
             Username: tempUsername,
             Password: tempPassword
@@ -369,7 +354,6 @@ function handleConfirmCode(e) {
             onSuccess: () => {
                 loadUserAttributes(() => {
                     showView('dashboard');
-                    // Cleanup
                     tempUsername = "";
                     tempPassword = "";
                 });
@@ -389,7 +373,6 @@ function initResendTimer() {
     const btn = document.getElementById('btn-resend-code');
     const timerSpan = document.getElementById('resend-timer');
 
-    // Carica dallo storage
     const stored = localStorage.getItem('nextResendAllowedAt');
     if (stored) {
         nextResendAllowedAt = parseInt(stored, 10);
@@ -415,7 +398,7 @@ function updateTimerUI() {
         btn.textContent = "Invia nuovo codice";
         timerSpan.classList.add('hidden');
         localStorage.removeItem('nextResendAllowedAt');
-        return true; // Ferma l'intervallo
+        return true;
     } else {
         btn.disabled = true;
         const sec = Math.ceil(diff / 1000);
@@ -439,7 +422,6 @@ function handleResendCode() {
         }
         setAuthMessage("Codice inviato nuovamente.", 'success', 'confirm-message');
 
-        // Reset Timer
         nextResendAllowedAt = Date.now() + 30000;
         localStorage.setItem('nextResendAllowedAt', nextResendAllowedAt);
         initResendTimer();
@@ -458,14 +440,11 @@ function handleForgotPasswordRequest(e) {
 
     user.forgotPassword({
         onSuccess: (data) => {
-            // Non dovrebbe succedere direttamente per forgotPassword di solito
             console.log("Forgot Password success logic reached unexpectedly", data);
         },
         onFailure: (err) => {
-            // Anti-enumeration: Non rivelare troppo, ma per il debug registriamo
             console.log(err);
             setAuthMessage("Se l'email esiste, riceverai un codice.", 'success', 'forgot-message');
-            // Mostra il form di reset 
             document.getElementById('form-forgot-request').classList.add('hidden');
             document.getElementById('form-forgot-reset').classList.remove('hidden');
         },
@@ -496,7 +475,6 @@ function handleForgotPasswordReset(e) {
             setAuthMessage("Password cambiata con successo! Effettua il login.", 'success', 'auth-message');
             switchAuthTab('signin');
             showView('auth');
-            // Cleanup forms
             document.getElementById('form-forgot-reset').reset();
             document.getElementById('form-forgot-request').reset();
         },
@@ -512,7 +490,6 @@ function handleLogout() {
         cognitoUser = null;
         currentUserAttributes = {};
 
-        // Pulisci i form
         document.getElementById('form-signin').reset();
         document.getElementById('form-signup').reset();
 
@@ -522,15 +499,12 @@ function handleLogout() {
 
 //User Attributes / Profile
 
-
-
 function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
 }
 
 function updateHeaderUI() {
-    // Prefer 'preferred_username' -> 'name' -> 'email'
     const dispName =
         currentUserAttributes['preferred_username'] ||
         currentUserAttributes['name'] ||
@@ -558,10 +532,7 @@ function handleEditUsername() {
                 alert("Errore aggiornamento: " + err.message);
                 return;
             }
-            // Aggiorna la cache locale e l'interfaccia utente
-            //currentUserAttributes['preferred_username'] = newName;
-            loadUserAttributes(); // refresh vero
-            // updateHeaderUI();
+            loadUserAttributes();
         });
     }
 }
@@ -580,22 +551,17 @@ function handleChangePassword(e) {
         return;
     }
 
-    // Branch: Challenge vs Normal Change
     if (cognitoUser.challengeName === 'NEW_PASSWORD_REQUIRED') {
         cognitoUser.completeNewPasswordChallenge(newPass, cognitoUser.challengeAttributes, {
             onSuccess: (result) => {
-                // Determina se è necessario confermare i dettagli dell’utente oppure se si può accedere direttamente alla dashboard
-                // Il risultato può essere una sessione o un oggetto utente, a seconda della versione dell’SDK o del flusso utilizzato
                 loadUserAttributes();
                 showView('dashboard');
 
-                // Cleanup UI
                 document.getElementById('modal-change-password').classList.add('hidden');
-                document.getElementById('cp-current').parentElement.classList.remove('hidden'); // Restore
+                document.getElementById('cp-current').parentElement.classList.remove('hidden');
                 document.getElementById('form-change-pass').reset();
                 msgBox.classList.add('hidden');
 
-                // Cleanup State
                 delete cognitoUser.challengeName;
                 delete cognitoUser.challengeAttributes;
             },
@@ -606,7 +572,6 @@ function handleChangePassword(e) {
             }
         });
     } else {
-        // Standard Cambio Password
         cognitoUser.changePassword(oldPass, newPass, (err, result) => {
             if (err) {
                 msgBox.textContent = err.message || "Errore cambio password.";
@@ -630,16 +595,13 @@ function validateConversionState() {
     const dropzone = document.getElementById('upload-dropzone');
     const convertBtn = document.getElementById('btn-convert');
 
-    // 1. Blocca se l'input == output
     if (inputFmt === outputFmt) {
         dropzone.classList.add('disabled');
         convertBtn.disabled = true;
         return;
     }
-    // Altrimenti abilita
     dropzone.classList.remove('disabled');
 
-    // 2.Abilita la conversione SOLO se c'è il file
     const fileInput = document.getElementById('audio-file');
     convertBtn.disabled = fileInput.files.length === 0;
 }
@@ -651,22 +613,19 @@ function handleFileSelect(e) {
     const inputFmt = document.getElementById('input-format').value;
     const outputFmt = document.getElementById('output-format').value;
 
-    // Blocca se input == output
     if (inputFmt === outputFmt) {
         alert("Input e Output devono essere diversi! Cambia uno dei due formati.");
         clearFileSelection();
         return;
     }
 
-    // Validazione dimensione
-    const maxSize = 50 * 1024 * 1024; // 50MB max
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
         alert("File troppo grande! Max 50 MB.");
         clearFileSelection();
         return;
     }
 
-    // Validazione estensione
     const fileExt = file.name.split('.').pop().toLowerCase();
 
     if (fileExt !== inputFmt) {
@@ -675,7 +634,6 @@ function handleFileSelect(e) {
         return;
     }
 
-    // Mostra UI
     document.getElementById('upload-dropzone').querySelector('.upload-placeholder').classList.add('hidden');
     const info = document.getElementById('file-info-display');
     info.classList.remove('hidden');
@@ -719,7 +677,7 @@ async function startConversion() {
         const jobRes = await fetch(`${CONFIG.API_BASE_URL}/jobs`, {
             method: 'POST',
             headers: {
-                'Authorization': token,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -752,11 +710,11 @@ async function startConversion() {
         console.log("[3] upload status:", upRes.status);
         if (!upRes.ok) throw new Error(`Errore upload S3: ${upRes.status}`);
 
-        // 2b) Conferma job (invia a SQS solo dopo upload completato)
+        // 2b) Conferma job
         console.log("[3b] POST /jobs/confirm...");
         const confirmRes = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}/confirm`, {
             method: 'POST',
-            headers: { 'Authorization': token }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!confirmRes.ok) throw new Error(`Errore conferma job: ${confirmRes.status}`);
 
@@ -774,13 +732,11 @@ async function startConversion() {
 }
 
 async function pollStatus(token) {
-    console.log("[DEBUG] Token:", token);
-    console.log("[DEBUG] URL:", `${CONFIG.API_BASE_URL}/jobs/${currentJobId}`);
     if (!currentJobId) return;
 
     try {
         const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}`, {
-            headers: { 'Authorization': token }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
         const status = data.status;
@@ -792,7 +748,6 @@ async function pollStatus(token) {
         } else if (status === 'FAILED') {
             throw new Error("Conversion failed on server.");
         } else {
-            // Continua il polling
             setTimeout(() => pollStatus(token), 3000);
         }
     } catch (e) {
@@ -813,7 +768,7 @@ async function downloadResult() {
         const token = session.getIdToken().getJwtToken();
 
         const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}/download`, {
-            headers: { 'Authorization': token }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
 
@@ -850,7 +805,6 @@ function handleDeleteAccount() {
         cognitoUser = null;
         currentUserAttributes = {};
 
-        // Pulisci form
         document.getElementById('form-signin').reset();
         document.getElementById('form-signup').reset();
 
