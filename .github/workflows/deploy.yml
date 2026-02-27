@@ -62,6 +62,30 @@ jobs:
             --output text)
           echo "distribution_id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
 
+      - name: Cleanup API Gateway stage if unmanaged
+        run: |
+          API_ID=$(aws apigateway get-rest-apis \
+            --query "items[?name=='waveshift-api'].id" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then
+            # Verifica se lo stage prod è già gestito da CloudFormation
+            STAGE_IN_STACK=$(aws cloudformation list-stack-resources \
+              --stack-name ${{ env.PROJECT_NAME }}-app-dev \
+              --query "StackResourceSummaries[?LogicalResourceId=='ApiStage'].PhysicalResourceId" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -z "$STAGE_IN_STACK" ] || [ "$STAGE_IN_STACK" == "None" ]; then
+              # Lo stage non è nello stack, eliminalo se esiste
+              aws apigateway delete-stage \
+                --rest-api-id $API_ID \
+                --stage-name prod 2>/dev/null || true
+              echo "Stage prod eliminato o non esistente, CloudFormation lo ricreerà"
+            else
+              echo "Stage prod già gestito da CloudFormation, nessuna azione necessaria"
+            fi
+          fi
+
       - name: Deploy App Stack
         run: |
           aws cloudformation deploy \
