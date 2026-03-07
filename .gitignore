@@ -29,3 +29,4 @@ __pycache__/
 *.zip
 backend/package/
 
+docs/

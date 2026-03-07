@@ -356,3 +356,4 @@ jobs:
             --output text)
           echo "### 🚀 Deploy completato!" >> $GITHUB_STEP_SUMMARY
           echo "**URL:** [https://$URL](https://$URL)" >> $GITHUB_STEP_SUMMARY
+          ##prova
