@@ -1,13 +1,16 @@
 // --- Stato Globale ---
 let userPool = null;
-let cognitoUser = null; // Oggetto utente autenticato corrente
-let currentUserAttributes = {}; // { email, sub, custom:username, etc. }
-let currentJobId = null;
+let cognitoUser = null;
+let currentUserAttributes = {};
+let currentJobId = null; // mantenuto per compatibilità (usato nel singolo download legacy)
 let tempPassword = "";
+
+// Stato multi-file
+let activeJobs = []; // [{ jobId, filename, status, downloadUrl }]
 
 // Stato temporaneo per flussi multi-step
 let tempUsername = "";
-let nextResendAllowedAt = 0; // Timestamp per il cooldown di rispedizione
+let nextResendAllowedAt = 0;
 
 // --- DOM Elements Override ---
 const views = {
@@ -65,7 +68,7 @@ function initUI() {
     document.getElementById('form-forgot-reset').addEventListener('submit', handleForgotPasswordReset);
     document.getElementById('form-change-pass').addEventListener('submit', handleChangePassword);
 
-    // Bottoni  
+    // Bottoni
     document.getElementById('btn-resend-code').addEventListener('click', handleResendCode);
     document.getElementById('link-forgot-password').addEventListener('click', (e) => {
         e.preventDefault();
@@ -101,7 +104,7 @@ function initUI() {
     const fileInput = document.getElementById('audio-file');
     const dropzone = document.getElementById('upload-dropzone');
 
-    // evita che il browser apra il file in una nuova tab/finestra
+    // Evita che il browser apra il file
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
         document.addEventListener(ev, (e) => {
             e.preventDefault();
@@ -111,7 +114,7 @@ function initUI() {
 
     fileInput.addEventListener('change', handleFileSelect);
 
-    // Drag & Drop  
+    // Drag & Drop (supporta più file)
     dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('active'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('active'));
     dropzone.addEventListener('drop', (e) => {
@@ -123,32 +126,28 @@ function initUI() {
         const files = e.dataTransfer.files;
         if (!files || !files.length) return;
 
-        // Mette davvero i file dentro l'input file
         const dt = new DataTransfer();
         for (const f of files) dt.items.add(f);
         fileInput.files = dt.files;
 
-        // Riusa lo stesso flusso di "Scegli file"
         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     document.getElementById('btn-clear-file').addEventListener('click', clearFileSelection);
     document.getElementById('btn-convert').addEventListener('click', startConversion);
-    document.getElementById('btn-download').addEventListener('click', downloadResult);
     document.querySelector('.brand').addEventListener('click', () => {
         if (cognitoUser) showView('dashboard');
     });
-    // Abilita il dropzone subito perché i select hanno valori di default
+
     validateConversionState();
 }
 
 
-// Navigazione / Views
+// --- Navigazione / Views ---
 function showView(viewName) {
     Object.values(views).forEach(el => el.classList.add('hidden'));
     views[viewName].classList.remove('hidden');
 
-    // Logica Header
     if (viewName === 'dashboard') {
         document.body.classList.add('authenticated');
     } else {
@@ -173,7 +172,7 @@ function setAuthMessage(msg, type = 'error', containerId = 'auth-message') {
     else box.classList.remove('hidden');
 }
 
-// Logic: Session & Auth
+// --- Logic: Session & Auth ---
 
 function checkSession() {
     const user = userPool.getCurrentUser();
@@ -184,7 +183,6 @@ function checkSession() {
                 showView('auth');
                 return;
             }
-            // Sessione valida    
             cognitoUser = user;
             loadUserAttributes();
             if (err) {
@@ -239,8 +237,6 @@ function handleSignIn(e) {
     const userData = { Username: email, Pool: userPool };
     cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-    console.log("CLICK LOGIN");
-
     cognitoUser.authenticateUser(authDetails, {
         onFailure: (err) => {
             console.error("AUTH FAIL", err);
@@ -259,9 +255,7 @@ function handleSignIn(e) {
         },
 
         onSuccess: (result) => {
-            console.log("AUTH SUCCESS");
             cognitoUser.getSession((err, session) => {
-                console.log("GET SESSION CALLBACK", { err, valid: session?.isValid?.() });
                 if (err || !session || !session.isValid()) {
                     console.error("Session not valid after login:", err);
                     setAuthMessage("Sessione non valida dopo il login.", "error");
@@ -269,7 +263,6 @@ function handleSignIn(e) {
                 }
 
                 loadUserAttributes((err) => {
-                    console.log("LOAD ATTR CALLBACK", err);
                     if (err) {
                         setAuthMessage("Login ok, ma errore UI/attributi. Guarda console.", "error");
                         return;
@@ -367,11 +360,8 @@ function handleConfirmCode(e) {
     });
 }
 
-// Logica di reinvio del codice 
+// --- Logica di reinvio del codice ---
 function initResendTimer() {
-    const btn = document.getElementById('btn-resend-code');
-    const timerSpan = document.getElementById('resend-timer');
-
     const stored = localStorage.getItem('nextResendAllowedAt');
     if (stored) {
         nextResendAllowedAt = parseInt(stored, 10);
@@ -439,7 +429,7 @@ function handleForgotPasswordRequest(e) {
 
     user.forgotPassword({
         onSuccess: (data) => {
-            console.log("Forgot Password success logic reached unexpectedly", data);
+            console.log("Forgot Password success", data);
         },
         onFailure: (err) => {
             console.log(err);
@@ -496,7 +486,7 @@ function handleLogout() {
     }
 }
 
-//User Attributes / Profile
+// --- User Attributes / Profile ---
 
 function setText(id, value) {
     const el = document.getElementById(id);
@@ -605,9 +595,10 @@ function validateConversionState() {
     convertBtn.disabled = fileInput.files.length === 0;
 }
 
+// Gestione selezione file multipli
 function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
 
     const inputFmt = document.getElementById('input-format').value;
     const outputFmt = document.getElementById('output-format').value;
@@ -619,43 +610,78 @@ function handleFileSelect(e) {
     }
 
     const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-        alert("File troppo grande! Max 50 MB.");
-        clearFileSelection();
-        return;
+    const invalidFiles = [];
+
+    for (const file of files) {
+        const fileExt = file.name.split('.').pop().toLowerCase();
+
+        if (file.size > maxSize) {
+            invalidFiles.push(`${file.name}: troppo grande (max 50 MB)`);
+            continue;
+        }
+
+        if (fileExt !== inputFmt) {
+            invalidFiles.push(`${file.name}: formato non corretto (atteso .${inputFmt})`);
+        }
     }
 
-    const fileExt = file.name.split('.').pop().toLowerCase();
+    if (invalidFiles.length > 0) {
+        alert("Alcuni file non sono validi e verranno ignorati:\n\n" + invalidFiles.join("\n"));
 
-    if (fileExt !== inputFmt) {
-        alert(`Formato file non corretto!\n\nHai selezionato Input Format: ${inputFmt.toUpperCase()}\nMa il file caricato è: ${fileExt.toUpperCase()}\n\nCambia il formato di input o carica un file diverso.`);
-        clearFileSelection();
-        return;
+        // Ricostruisce l'input solo con i file validi
+        const dt = new DataTransfer();
+        for (const file of files) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (file.size <= maxSize && ext === inputFmt) {
+                dt.items.add(file);
+            }
+        }
+        e.target.files = dt.files;
+
+        if (dt.files.length === 0) {
+            clearFileSelection();
+            return;
+        }
     }
 
-    document.getElementById('upload-dropzone').querySelector('.upload-placeholder').classList.add('hidden');
-    const info = document.getElementById('file-info-display');
-    info.classList.remove('hidden');
-    info.querySelector('.filename').textContent = file.name;
-    info.querySelector('.filesize').textContent = `(${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-
+    renderFileList(Array.from(e.target.files));
     validateConversionState();
+}
+
+// Mostra la lista dei file selezionati nel dropzone
+function renderFileList(files) {
+    const placeholder = document.getElementById('upload-dropzone').querySelector('.upload-placeholder');
+    const listContainer = document.getElementById('file-list-display');
+    const listEl = document.getElementById('file-list-items');
+
+    placeholder.classList.add('hidden');
+    listContainer.classList.remove('hidden');
+
+    listEl.innerHTML = '';
+    files.forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        listEl.appendChild(li);
+    });
 }
 
 function clearFileSelection() {
     const fileInput = document.getElementById('audio-file');
     fileInput.value = "";
     document.getElementById('upload-dropzone').querySelector('.upload-placeholder').classList.remove('hidden');
-    document.getElementById('file-info-display').classList.add('hidden');
+    document.getElementById('file-list-display').classList.add('hidden');
+    document.getElementById('file-list-items').innerHTML = '';
     validateConversionState();
 }
 
+// --- Avvia conversione per tutti i file selezionati ---
 async function startConversion() {
-    const file = document.getElementById('audio-file').files[0];
+    const files = Array.from(document.getElementById('audio-file').files);
     const outputFormat = document.getElementById('output-format').value;
-    if (!file) return;
+    if (!files.length) return;
 
     // Reset UI
+    activeJobs = [];
     const statusBox = document.getElementById('conversion-status');
     statusBox.classList.remove('hidden');
     document.getElementById('progress-state').classList.remove('hidden');
@@ -663,16 +689,71 @@ async function startConversion() {
     document.getElementById('error-state').classList.add('hidden');
     document.getElementById('btn-convert').disabled = true;
 
+    // Render lista progress
+    const progressList = document.getElementById('jobs-progress-list');
+    progressList.innerHTML = '';
+    files.forEach(file => {
+        const li = document.createElement('li');
+        li.id = `progress-${file.name}`;
+        li.innerHTML = `<span class="job-filename">${file.name}</span> — <span class="job-status">In attesa...</span>`;
+        progressList.appendChild(li);
+    });
+
     try {
-        // Ottieni JWT
         const session = await new Promise((resolve, reject) => {
             cognitoUser.getSession((err, session) => err ? reject(err) : resolve(session));
         });
         const token = session.getIdToken().getJwtToken();
-        console.log("[1] JWT OK, len=", token?.length);
 
-        // 1) Creazione Job
-        console.log("[2] POST /jobs ->", `${CONFIG.API_BASE_URL}/jobs`);
+        // Avvia tutti i job in parallelo
+        const jobPromises = files.map(file => convertSingleFile(file, outputFormat, token));
+        await Promise.allSettled(jobPromises);
+
+        // Controlla se tutti sono riusciti o meno
+        const failed = activeJobs.filter(j => j.status === 'FAILED');
+        const succeeded = activeJobs.filter(j => j.status === 'SUCCEEDED');
+
+        document.getElementById('progress-state').classList.add('hidden');
+
+        if (succeeded.length > 0) {
+            document.getElementById('success-state').classList.remove('hidden');
+
+            // Genera un bottone download per ogni job riuscito
+            const container = document.getElementById('download-buttons-container');
+            container.innerHTML = '';
+            for (const job of succeeded) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-dl btn-dl-file';
+                btn.textContent = `⬇ Scarica ${job.filename}`;
+                btn.addEventListener('click', () => downloadJobResult(token, job.jobId));
+                container.appendChild(btn);
+            }
+        }
+
+        if (failed.length > 0) {
+            document.getElementById('error-state').classList.remove('hidden');
+        }
+
+    } catch (e) {
+        console.error("[X] startConversion error:", e);
+        document.getElementById('progress-state').classList.add('hidden');
+        document.getElementById('error-state').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-convert').disabled = false;
+}
+
+// Gestisce il ciclo completo di un singolo file: crea job → upload → confirm → poll
+async function convertSingleFile(file, outputFormat, token) {
+    const updateStatus = (msg) => {
+        const el = document.querySelector(`#progress-${CSS.escape(file.name)} .job-status`);
+        if (el) el.textContent = msg;
+    };
+
+    updateStatus('Creazione job...');
+
+    try {
+        // 1) Crea il job
         const jobRes = await fetch(`${CONFIG.API_BASE_URL}/jobs`, {
             method: 'POST',
             headers: {
@@ -686,88 +767,72 @@ async function startConversion() {
             })
         });
 
-        console.log("[2] /jobs status:", jobRes.status);
-        const jobText = await jobRes.text();
-        console.log("[2] /jobs body:", jobText);
-
         if (!jobRes.ok) throw new Error(`Errore creazione job: ${jobRes.status}`);
-
-        const jobData = JSON.parse(jobText);
-        currentJobId = jobData.jobId;
+        const jobData = await jobRes.json();
+        const jobId = jobData.jobId;
         const uploadUrl = jobData.uploadUrl;
 
-        console.log("[2] jobId:", currentJobId);
-        console.log("[2] uploadUrl exists?", !!uploadUrl);
+        activeJobs.push({ jobId, filename: file.name, status: 'PENDING' });
+        updateStatus('Upload in corso...');
 
-        // 2) Upload su S3
-        console.log("[3] PUT presigned upload...");
+        // 2) Upload S3
         const upRes = await fetch(uploadUrl, {
             method: 'PUT',
             headers: { 'Content-Type': file.type || 'application/octet-stream' },
             body: file
         });
-        console.log("[3] upload status:", upRes.status);
         if (!upRes.ok) throw new Error(`Errore upload S3: ${upRes.status}`);
 
-        // 2b) Conferma job
-        console.log("[3b] POST /jobs/confirm...");
-        const confirmRes = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}/confirm`, {
+        // 3) Conferma job
+        updateStatus('Conferma job...');
+        const confirmRes = await fetch(`${CONFIG.API_BASE_URL}/jobs/${jobId}/confirm`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!confirmRes.ok) throw new Error(`Errore conferma job: ${confirmRes.status}`);
 
-        // 3) Poll Status
-        console.log("[4] start polling status for jobId=", currentJobId);
-        pollStatus(token);
+        // 4) Poll
+        updateStatus('Conversione in corso...');
+        await pollSingleJob(token, jobId, file.name, updateStatus);
 
     } catch (e) {
-        console.log("[X] Conversion failed:", e);
-        document.getElementById('progress-state').classList.add('hidden');
-        document.getElementById('error-state').classList.remove('hidden');
-        document.getElementById('btn-convert').disabled = false;
+        console.error(`[X] ${file.name}:`, e);
+        updateStatus('❌ Errore');
+        const job = activeJobs.find(j => j.filename === file.name);
+        if (job) job.status = 'FAILED';
     }
-
 }
 
-async function pollStatus(token) {
-    if (!currentJobId) return;
+// Poll finché il job non è SUCCEEDED o FAILED
+async function pollSingleJob(token, jobId, filename, updateStatus) {
+    while (true) {
+        await new Promise(r => setTimeout(r, 3000));
 
-    try {
-        const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}`, {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${jobId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
-        console.log("[POLL] response:", JSON.stringify(data));
         const status = data.status;
 
         if (status === 'SUCCEEDED') {
-            document.getElementById('progress-state').classList.add('hidden');
-            document.getElementById('success-state').classList.remove('hidden');
-            document.getElementById('btn-convert').disabled = false;
+            updateStatus('✅ Completato');
+            const job = activeJobs.find(j => j.jobId === jobId);
+            if (job) job.status = 'SUCCEEDED';
+            return;
         } else if (status === 'FAILED') {
-            throw new Error("Conversion failed on server.");
-        } else {
-            setTimeout(() => pollStatus(token), 3000);
+            updateStatus('❌ Fallito');
+            const job = activeJobs.find(j => j.jobId === jobId);
+            if (job) job.status = 'FAILED';
+            throw new Error(`Job ${jobId} failed on server`);
         }
-    } catch (e) {
-        console.log("[X] Conversion failed:", e);
-        document.getElementById('progress-state').classList.add('hidden');
-        document.getElementById('error-state').classList.remove('hidden');
-        document.getElementById('btn-convert').disabled = false;
+        // altrimenti continua il polling
     }
 }
 
-async function downloadResult() {
-    if (!currentJobId) return;
-
+// Download di un singolo job tramite jobId
+async function downloadJobResult(token, jobId) {
     try {
-        const session = await new Promise((resolve, reject) => {
-            cognitoUser.getSession((err, session) => err ? reject(err) : resolve(session));
-        });
-        const token = session.getIdToken().getJwtToken();
-
-        const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${currentJobId}/download`, {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/jobs/${jobId}/download`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
@@ -782,8 +847,22 @@ async function downloadResult() {
     }
 }
 
+// Mantenuto per compatibilità con eventuali chiamate legacy
+async function downloadResult() {
+    if (!currentJobId) return;
+    try {
+        const session = await new Promise((resolve, reject) => {
+            cognitoUser.getSession((err, session) => err ? reject(err) : resolve(session));
+        });
+        const token = session.getIdToken().getJwtToken();
+        await downloadJobResult(token, currentJobId);
+    } catch (e) {
+        alert("Errore download: " + e.message);
+    }
+}
 
-// Elimina account
+
+// --- Elimina account ---
 function handleDeleteAccount() {
     if (!confirm("Sei sicuro di voler eliminare il tuo account?\n\nQuesta azione è IRREVERSIBILE.\n\nTutti i tuoi dati e conversioni saranno persi per sempre.")) {
         return;

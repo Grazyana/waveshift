@@ -179,7 +179,7 @@
                     <div class="step-icon">📁</div>
                     <div class="step-number">1</div>
                     <h4>Carica</h4>
-                    <p>Trascina o seleziona il tuo file audio (max 50 MB)</p>
+                    <p>Trascina o seleziona uno o più file audio (max 50 MB ciascuno)</p>
                 </div>
                 <div class="step-arrow">→</div>
                 <div class="step-card">
@@ -193,7 +193,7 @@
                     <div class="step-icon">⬇️</div>
                     <div class="step-number">3</div>
                     <h4>Scarica</h4>
-                    <p>Il file convertito è pronto in pochi istanti</p>
+                    <p>I file convertiti sono pronti in pochi istanti</p>
                 </div>
             </div>
 
@@ -227,14 +227,15 @@
                         <svg viewBox="0 0 24 24" class="upload-icon">
                             <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                         </svg>
-                        <p>Trascina il file qui o</p>
+                        <p>Trascina i file qui o</p>
+                        <!-- multiple aggiunto per supportare più file -->
                         <button class="btn-outline" id="btn-browse">Scegli File</button>
-                        <input type="file" id="audio-file" accept="audio/*" hidden>
+                        <input type="file" id="audio-file" accept="audio/*" multiple hidden>
                     </div>
-                    <div class="file-info hidden" id="file-info-display">
-                        <span class="filename">me_singing.wav</span>
-                        <span class="filesize">(12 MB)</span>
-                        <button class="btn-clear" id="btn-clear-file">✕</button>
+                    <!-- Lista file selezionati (sostituisce il singolo file-info-display) -->
+                    <div class="file-list hidden" id="file-list-display">
+                        <ul id="file-list-items"></ul>
+                        <button class="btn-clear" id="btn-clear-file">✕ Rimuovi tutti</button>
                     </div>
                 </div>
 
@@ -244,26 +245,22 @@
 
                 <!-- Progress & Result -->
                 <div id="conversion-status" class="status-box hidden">
-                    <!-- Progress State -->
+                    <!-- Progress State: lista di job con stato individuale -->
                     <div id="progress-state" class="hidden">
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-indeterminate"></div>
-                        </div>
-                        <p class="status-text">Conversione in corso...</p>
+                        <ul id="jobs-progress-list"></ul>
                     </div>
 
                     <!-- Success State -->
                     <div id="success-state" class="hidden">
-                        <p class="success-msg">Conversione completata!</p>
-                        <div class="download-actions">
-                            <button id="btn-download" class="btn-dl btn-dl-file"> Scarica File</button>
+                        <p class="success-msg">Tutte le conversioni completate!</p>
+                        <div class="download-actions" id="download-buttons-container">
+                            <!-- I bottoni di download vengono generati dinamicamente in app.js -->
                         </div>
-
                     </div>
 
                     <!-- Error State -->
                     <div id="error-state" class="hidden">
-                        <p class="error-msg">Errore durante la conversione.</p>
+                        <p class="error-msg">Uno o più file non sono stati convertiti correttamente.</p>
                     </div>
                 </div>
             </div>
@@ -293,7 +290,7 @@
                 <div class="info-card limit-card">
                     <div class="fmt-icon">⚠️</div>
                     <h4>Limiti</h4>
-                    <p>Dimensione massima: <strong>50 MB</strong>.</p>
+                    <p>Dimensione massima: <strong>50 MB</strong> per file.</p>
                 </div>
             </div>
             <!-- FAQ Section -->
@@ -307,7 +304,8 @@
                     </div>
                     <div class="faq-item">
                         <h4>Qual è la dimensione massima del file?</h4>
-                        <p>Puoi caricare file fino a <strong>50 MB</strong>. Per file più grandi ti consigliamo di
+                        <p>Puoi caricare file fino a <strong>50 MB</strong> ciascuno. Per file più grandi ti consigliamo
+                            di
                             comprimerli prima della conversione.</p>
                     </div>
                     <div class="faq-item">
