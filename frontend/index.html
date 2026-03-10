@@ -97,17 +97,16 @@
                 <div class="profile-dropdown hidden" id="profileDropdown">
                     <div class="dropdown-header">
                         <span id="dropdown-username" class="dropdown-user">User</span>
-                        <button class="edit-btn-small" id="btnEditUsername" title="Modifica Username">✎</button>
+                        <button class="edit-btn-small" id="btnEditUsername" title="Modifica Username">&#9998;</button>
                     </div>
                     <div class="dropdown-item email-item">
                         <span class="label">Email</span>
-                        <span id="dropdown-email" class="value"><a href="/cdn-cgi/l/email-protection"
-                                class="__cf_email__"
-                                data-cfemail="621711071022071a030f120e074c010d0f">[email&#160;protected]</a></span>
+                        <!-- Nessuna email hardcodata: viene popolata da app.js -->
+                        <span id="dropdown-email" class="value">&#8212;</span>
                     </div>
                     <div class="dropdown-item">
                         <span class="label">Password</span>
-                        <span class="value">••••••••</span>
+                        <span class="value">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
                         <button class="link-btn" id="btnChangePassword">Modifica</button>
                     </div>
                     <hr>
@@ -138,7 +137,8 @@
                         </div>
                         <div class="form-group">
                             <label for="signin-password">Password</label>
-                            <input type="password" id="signin-password" required placeholder="••••••••">
+                            <input type="password" id="signin-password" required
+                                placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;">
                         </div>
                         <div class="form-actions">
                             <a href="#" id="link-forgot-password" class="forgot-link">Password dimenticata?</a>
@@ -191,7 +191,7 @@
                     </div>
                 </form>
 
-                <!-- Step 2: Reset Password (inizialmente nascosto) -->
+                <!-- Step 2: Reset Password -->
                 <form id="form-forgot-reset" class="hidden">
                     <div class="form-group">
                         <label for="reset-code">Codice di conferma</label>
@@ -245,21 +245,21 @@
             <!-- Sezione Come Funziona -->
             <div class="how-it-works">
                 <div class="step-card">
-                    <div class="step-icon">📁</div>
+                    <div class="step-icon">&#128193;</div>
                     <div class="step-number">1</div>
                     <h4>Carica</h4>
-                    <p>Trascina o seleziona uno o più file audio (max 50 MB ciascuno)</p>
+                    <p>Trascina o seleziona uno o pi&#249; file audio (max 50 MB ciascuno)</p>
                 </div>
-                <div class="step-arrow">→</div>
+                <div class="step-arrow">&#8594;</div>
                 <div class="step-card">
-                    <div class="step-icon">⚡</div>
+                    <div class="step-icon">&#9889;</div>
                     <div class="step-number">2</div>
                     <h4>Converti</h4>
                     <p>Scegli il formato di output e avvia la conversione</p>
                 </div>
-                <div class="step-arrow">→</div>
+                <div class="step-arrow">&#8594;</div>
                 <div class="step-card">
-                    <div class="step-icon">⬇️</div>
+                    <div class="step-icon">&#11015;&#65039;</div>
                     <div class="step-number">3</div>
                     <h4>Scarica</h4>
                     <p>I file convertiti sono pronti in pochi istanti</p>
@@ -267,7 +267,7 @@
             </div>
 
             <div class="converter-card">
-                <!-- Step 1: Selection -->
+                <!-- Step 1: Format Selection -->
                 <div class="conversion-steps">
                     <div class="step-group">
                         <label>Input Format</label>
@@ -278,7 +278,7 @@
                             <option value="ogg">OGG</option>
                         </select>
                     </div>
-                    <div class="arrow-icon">➔</div>
+                    <div class="arrow-icon">&#10156;</div>
                     <div class="step-group">
                         <label>Output Format</label>
                         <select id="output-format">
@@ -297,11 +297,10 @@
                             <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                         </svg>
                         <p>Trascina i file qui o</p>
-                        <!-- multiple aggiunto per supportare più file -->
                         <button class="btn-outline" id="btn-browse">Scegli File</button>
                         <input type="file" id="audio-file" accept="audio/*" multiple hidden>
                     </div>
-                    <!-- Lista file selezionati (sostituisce il singolo file-info-display) -->
+                    <!-- Lista file selezionati con checkbox -->
                     <div class="file-list hidden" id="file-list-display">
                         <ul id="file-list-items"></ul>
                     </div>
@@ -325,14 +324,12 @@
                     <!-- Success State -->
                     <div id="success-state" class="hidden">
                         <p class="success-msg">Tutte le conversioni completate!</p>
-                        <div class="download-actions" id="download-buttons-container">
-                            <!-- I bottoni di download vengono generati dinamicamente in app.js -->
-                        </div>
+                        <div class="download-actions" id="download-buttons-container"></div>
                     </div>
 
                     <!-- Error State -->
                     <div id="error-state" class="hidden">
-                        <p class="error-msg">Uno o più file non sono stati convertiti correttamente.</p>
+                        <p class="error-msg">Uno o pi&#249; file non sono stati convertiti correttamente.</p>
                     </div>
                 </div>
             </div>
@@ -340,71 +337,65 @@
             <!-- Informative Cards -->
             <div class="info-grid">
                 <div class="info-card fmt-card fmt-wav">
-                    <div class="fmt-icon">🎚️</div>
+                    <div class="fmt-icon">&#127898;&#65039;</div>
                     <h4>WAV</h4>
-                    <p>Alta qualità, non compresso. Ideale per editing professionale.</p>
+                    <p>Alta qualit&#224;, non compresso. Ideale per editing professionale.</p>
                 </div>
                 <div class="info-card fmt-card fmt-mp3">
-                    <div class="fmt-icon">🎵</div>
+                    <div class="fmt-icon">&#127925;</div>
                     <h4>MP3</h4>
                     <p>Standard universale, compresso (lossy). Ottimo per condivisione.</p>
                 </div>
                 <div class="info-card fmt-card fmt-m4a">
-                    <div class="fmt-icon">🍎</div>
+                    <div class="fmt-icon">&#127822;</div>
                     <h4>M4A (AAC)</h4>
-                    <p>Ottimizzato per Apple/Mobile. Qualità superiore a MP3 a parità di peso.</p>
+                    <p>Ottimizzato per Apple/Mobile. Qualit&#224; superiore a MP3 a parit&#224; di peso.</p>
                 </div>
                 <div class="info-card fmt-card fmt-ogg">
-                    <div class="fmt-icon">🌐</div>
+                    <div class="fmt-icon">&#127760;</div>
                     <h4>OGG</h4>
                     <p>Formato open. Efficiente per streaming e applicazioni web.</p>
                 </div>
                 <div class="info-card limit-card">
-                    <div class="fmt-icon">⚠️</div>
+                    <div class="fmt-icon">&#9888;&#65039;</div>
                     <h4>Limiti</h4>
                     <p>Dimensione massima: <strong>50 MB</strong> per file.</p>
                 </div>
             </div>
+
             <!-- FAQ Section -->
             <div class="faq-section">
                 <h3 class="faq-title">Domande frequenti</h3>
                 <div class="faq-grid">
                     <div class="faq-item">
                         <h4>Quali formati sono supportati?</h4>
-                        <p>WaveShift supporta i formati più diffusi: WAV, MP3, M4A e OGG. Puoi convertire da e verso
-                            qualsiasi combinazione di questi formati.</p>
+                        <p>WaveShift supporta i formati pi&#249; diffusi: WAV, MP3, M4A e OGG.</p>
                     </div>
                     <div class="faq-item">
-                        <h4>Qual è la dimensione massima del file?</h4>
-                        <p>Puoi caricare file fino a <strong>50 MB</strong> ciascuno. Per file più grandi ti consigliamo
-                            di
-                            comprimerli prima della conversione.</p>
+                        <h4>Qual &#232; la dimensione massima del file?</h4>
+                        <p>Puoi caricare file fino a <strong>50 MB</strong> ciascuno.</p>
                     </div>
                     <div class="faq-item">
                         <h4>I miei file vengono conservati?</h4>
-                        <p>No. I file vengono eliminati automaticamente dai nostri server dopo la conversione. La tua
-                            privacy è garantita.</p>
+                        <p>No. I file vengono eliminati automaticamente dopo la conversione.</p>
                     </div>
                     <div class="faq-item">
-                        <h4>La conversione è sicura?</h4>
-                        <p>Sì. Tutte le comunicazioni sono cifrate e i tuoi file non sono accessibili ad altri utenti in
-                            nessun momento.</p>
+                        <h4>La conversione &#232; sicura?</h4>
+                        <p>S&#236;. Tutte le comunicazioni sono cifrate e i tuoi file non sono accessibili ad altri.</p>
                     </div>
                     <div class="faq-item">
                         <h4>Quanto tempo richiede una conversione?</h4>
-                        <p>Dipende dalla dimensione del file, ma nella maggior parte dei casi la conversione si completa
-                            in pochi secondi.</p>
+                        <p>Nella maggior parte dei casi la conversione si completa in pochi secondi.</p>
                     </div>
                     <div class="faq-item">
                         <h4>Ho bisogno di un account?</h4>
-                        <p>Sì, WaveShift richiede una registrazione gratuita per garantire sicurezza e tracciabilità
-                            delle conversioni.</p>
+                        <p>S&#236;, WaveShift richiede una registrazione gratuita.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Modal Change Password (Global/Overlay) -->
+        <!-- Modal Change Password -->
         <div id="modal-change-password" class="modal-overlay hidden">
             <div class="modal">
                 <h3>Cambia Password</h3>
@@ -433,4 +424,10 @@
     </main>
 
     <!-- Script -->
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+
+</body>
+
+</html>
