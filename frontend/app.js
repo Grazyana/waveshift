@@ -133,7 +133,7 @@ function initUI() {
         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    document.getElementById('btn-clear-file').addEventListener('click', clearFileSelection);
+
     document.getElementById('btn-convert').addEventListener('click', startConversion);
     document.querySelector('.brand').addEventListener('click', () => {
         if (cognitoUser) showView('dashboard');
@@ -648,7 +648,7 @@ function handleFileSelect(e) {
     validateConversionState();
 }
 
-// Mostra la lista dei file selezionati nel dropzone
+// Mostra la lista dei file selezionati nel dropzone con checkbox cliccabili
 function renderFileList(files) {
     const placeholder = document.getElementById('upload-dropzone').querySelector('.upload-placeholder');
     const listContainer = document.getElementById('file-list-display');
@@ -658,11 +658,44 @@ function renderFileList(files) {
     listContainer.classList.remove('hidden');
 
     listEl.innerHTML = '';
-    files.forEach(file => {
+    Array.from(files).forEach((file) => {
         const li = document.createElement('li');
-        li.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        li.className = 'file-check-item';
+        li.dataset.filename = file.name;
+
+        const checkId = 'chk-' + file.name.replace(/[^a-zA-Z0-9]/g, '_');
+        li.innerHTML =
+            '<input type="checkbox" id="' + checkId + '" class="file-checkbox" checked>' +
+            '<label for="' + checkId + '" class="file-check-label">' +
+            '  <span class="file-check-name">' + file.name + '</span>' +
+            '  <span class="file-check-size">(' + (file.size / 1024 / 1024).toFixed(2) + ' MB)</span>' +
+            '</label>';
+
+        // Al click della checkbox, rimuove il file
+        const checkbox = li.querySelector('.file-checkbox');
+        checkbox.addEventListener('change', () => {
+            removeSingleFile(file.name);
+        });
+
         listEl.appendChild(li);
     });
+}
+
+// Rimuove un singolo file dall'input
+function removeSingleFile(filename) {
+    const fileInput = document.getElementById('audio-file');
+    const dt = new DataTransfer();
+    Array.from(fileInput.files).forEach(f => {
+        if (f.name !== filename) dt.items.add(f);
+    });
+    fileInput.files = dt.files;
+
+    if (fileInput.files.length === 0) {
+        clearFileSelection();
+    } else {
+        renderFileList(fileInput.files);
+        validateConversionState();
+    }
 }
 
 function clearFileSelection() {
@@ -689,15 +722,16 @@ async function startConversion() {
     document.getElementById('error-state').classList.add('hidden');
     document.getElementById('btn-convert').disabled = true;
 
-    // Render lista progress
+    // Render lista nomi file sotto la barra
     const progressList = document.getElementById('jobs-progress-list');
     progressList.innerHTML = '';
     files.forEach(file => {
         const li = document.createElement('li');
-        li.id = `progress-${file.name}`;
-        li.innerHTML = `<span class="job-filename">${file.name}</span> — <span class="job-status">In attesa...</span>`;
+        li.id = 'progress-' + CSS.escape(file.name);
+        li.textContent = file.name;
         progressList.appendChild(li);
     });
+    document.getElementById('progress-status-text').textContent = 'Conversione in corso... (0 / ' + files.length + ')';
 
     try {
         const session = await new Promise((resolve, reject) => {
@@ -745,12 +779,10 @@ async function startConversion() {
 
 // Gestisce il ciclo completo di un singolo file: crea job → upload → confirm → poll
 async function convertSingleFile(file, outputFormat, token) {
+    // updateStatus: aggiorna il contatore nella barra (non testo per item)
     const updateStatus = (msg) => {
-        const el = document.querySelector(`#progress-${CSS.escape(file.name)} .job-status`);
-        if (el) el.textContent = msg;
+        // usato solo internamente per segnalare completamento/fallimento
     };
-
-    updateStatus('Creazione job...');
 
     try {
         // 1) Crea il job
@@ -773,7 +805,7 @@ async function convertSingleFile(file, outputFormat, token) {
         const uploadUrl = jobData.uploadUrl;
 
         activeJobs.push({ jobId, filename: file.name, status: 'PENDING' });
-        updateStatus('Upload in corso...');
+
 
         // 2) Upload S3
         const upRes = await fetch(uploadUrl, {
@@ -784,7 +816,7 @@ async function convertSingleFile(file, outputFormat, token) {
         if (!upRes.ok) throw new Error(`Errore upload S3: ${upRes.status}`);
 
         // 3) Conferma job
-        updateStatus('Conferma job...');
+
         const confirmRes = await fetch(`${CONFIG.API_BASE_URL}/jobs/${jobId}/confirm`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -792,12 +824,12 @@ async function convertSingleFile(file, outputFormat, token) {
         if (!confirmRes.ok) throw new Error(`Errore conferma job: ${confirmRes.status}`);
 
         // 4) Poll
-        updateStatus('Conversione in corso...');
+
         await pollSingleJob(token, jobId, file.name, updateStatus);
 
     } catch (e) {
         console.error(`[X] ${file.name}:`, e);
-        updateStatus('❌ Errore');
+        // nessun aggiornamento per-item, il contatore verrà aggiornato dal poll
         const job = activeJobs.find(j => j.filename === file.name);
         if (job) job.status = 'FAILED';
     }
@@ -815,15 +847,22 @@ async function pollSingleJob(token, jobId, filename, updateStatus) {
         const status = data.status;
 
         if (status === 'SUCCEEDED') {
-            updateStatus('✅ Completato');
             const job = activeJobs.find(j => j.jobId === jobId);
             if (job) job.status = 'SUCCEEDED';
+            // aggiorna contatore barra
+            const done = activeJobs.filter(j => j.status === 'SUCCEEDED' || j.status === 'FAILED').length;
+            const total = document.getElementById('jobs-progress-list').children.length;
+            const txt = document.getElementById('progress-status-text');
+            if (txt) txt.textContent = 'Conversione in corso... (' + done + ' / ' + total + ')';
             return;
         } else if (status === 'FAILED') {
-            updateStatus('❌ Fallito');
             const job = activeJobs.find(j => j.jobId === jobId);
             if (job) job.status = 'FAILED';
-            throw new Error(`Job ${jobId} failed on server`);
+            const done = activeJobs.filter(j => j.status === 'SUCCEEDED' || j.status === 'FAILED').length;
+            const total = document.getElementById('jobs-progress-list').children.length;
+            const txt = document.getElementById('progress-status-text');
+            if (txt) txt.textContent = 'Conversione in corso... (' + done + ' / ' + total + ')';
+            throw new Error('Job ' + jobId + ' failed on server');
         }
         // altrimenti continua il polling
     }

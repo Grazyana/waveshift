@@ -6,6 +6,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaveShift</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Lista file selezionati con checkbox */
+        #file-list-items {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+            width: 100%;
+        }
+
+        .file-check-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 4px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .file-check-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: #5c6bc0;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .file-check-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            cursor: pointer;
+            font-size: 0.88rem;
+            overflow: hidden;
+        }
+
+        .file-check-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .file-check-size {
+            color: #aaa;
+            font-size: 0.78rem;
+            flex-shrink: 0;
+        }
+
+        /* Barra di progresso + lista file in conversione */
+        #jobs-progress-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0 0;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        #jobs-progress-list li {
+            padding: 2px 0;
+        }
+    </style>
 </head>
 
 <body>
@@ -34,7 +101,9 @@
                     </div>
                     <div class="dropdown-item email-item">
                         <span class="label">Email</span>
-                        <span id="dropdown-email" class="value">user@example.com</span>
+                        <span id="dropdown-email" class="value"><a href="/cdn-cgi/l/email-protection"
+                                class="__cf_email__"
+                                data-cfemail="621711071022071a030f120e074c010d0f">[email&#160;protected]</a></span>
                     </div>
                     <div class="dropdown-item">
                         <span class="label">Password</span>
@@ -235,7 +304,6 @@
                     <!-- Lista file selezionati (sostituisce il singolo file-info-display) -->
                     <div class="file-list hidden" id="file-list-display">
                         <ul id="file-list-items"></ul>
-                        <button class="btn-clear" id="btn-clear-file">✕ Rimuovi tutti</button>
                     </div>
                 </div>
 
@@ -245,8 +313,12 @@
 
                 <!-- Progress & Result -->
                 <div id="conversion-status" class="status-box hidden">
-                    <!-- Progress State: lista di job con stato individuale -->
+                    <!-- Progress State -->
                     <div id="progress-state" class="hidden">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-indeterminate"></div>
+                        </div>
+                        <p class="status-text" id="progress-status-text">Conversione in corso...</p>
                         <ul id="jobs-progress-list"></ul>
                     </div>
 
@@ -361,10 +433,4 @@
     </main>
 
     <!-- Script -->
-    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
-    <script src="config.js"></script>
-    <script src="app.js"></script>
-
-</body>
-
-</html>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-
