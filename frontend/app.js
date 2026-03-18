@@ -7,6 +7,7 @@ let tempPassword = "";
 
 // Stato multi-file
 let activeJobs = []; // [{ jobId, filename, status, downloadUrl }]
+let selectedFiles = []; // accumulo file selezionati (aggiunta progressiva)
 
 // Stato temporaneo per flussi multi-step
 let tempUsername = "";
@@ -591,60 +592,57 @@ function validateConversionState() {
     }
     dropzone.classList.remove('disabled');
 
-    const fileInput = document.getElementById('audio-file');
-    convertBtn.disabled = fileInput.files.length === 0;
+    convertBtn.disabled = selectedFiles.length === 0;
 }
 
-// Gestione selezione file multipli
+// Gestione selezione file multipli — AGGIUNGE ai file già presenti
 function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
+    const newFiles = Array.from(e.target.files);
+    if (!newFiles.length) return;
+
+    // Reset input subito così il prossimo click rileva sempre un "change"
+    e.target.value = "";
 
     const inputFmt = document.getElementById('input-format').value;
     const outputFmt = document.getElementById('output-format').value;
 
     if (inputFmt === outputFmt) {
         alert("Input e Output devono essere diversi! Cambia uno dei due formati.");
-        clearFileSelection();
         return;
     }
 
     const maxSize = 50 * 1024 * 1024;
     const invalidFiles = [];
+    const validNew = [];
 
-    for (const file of files) {
+    for (const file of newFiles) {
         const fileExt = file.name.split('.').pop().toLowerCase();
 
         if (file.size > maxSize) {
             invalidFiles.push(`${file.name}: troppo grande (max 50 MB)`);
             continue;
         }
-
         if (fileExt !== inputFmt) {
             invalidFiles.push(`${file.name}: formato non corretto (atteso .${inputFmt})`);
+            continue;
         }
+        // Evita duplicati per nome
+        if (selectedFiles.some(f => f.name === file.name)) {
+            invalidFiles.push(`${file.name}: già presente`);
+            continue;
+        }
+        validNew.push(file);
     }
 
     if (invalidFiles.length > 0) {
-        alert("Alcuni file non sono validi e verranno ignorati:\n\n" + invalidFiles.join("\n"));
-
-        // Ricostruisce l'input solo con i file validi
-        const dt = new DataTransfer();
-        for (const file of files) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (file.size <= maxSize && ext === inputFmt) {
-                dt.items.add(file);
-            }
-        }
-        e.target.files = dt.files;
-
-        if (dt.files.length === 0) {
-            clearFileSelection();
-            return;
-        }
+        alert("Alcuni file non sono stati aggiunti:\n\n" + invalidFiles.join("\n"));
     }
 
-    renderFileList(Array.from(e.target.files));
+    if (validNew.length === 0) return;
+
+    // Accumula
+    selectedFiles = selectedFiles.concat(validNew);
+    renderFileList(selectedFiles);
     validateConversionState();
 }
 
@@ -655,13 +653,11 @@ function renderFileList(files) {
     const listContainer = document.getElementById('file-list-display');
     const listEl = document.getElementById('file-list-items');
 
-    // FIX 1: il placeholder rimane sempre visibile (solo il btn-browse è sempre disponibile)
-    // Mostriamo la lista file SOTTO il placeholder, senza nasconderlo
     placeholder.classList.remove('hidden');
     listContainer.classList.remove('hidden');
 
     listEl.innerHTML = '';
-    Array.from(files).forEach((file) => {
+    files.forEach((file) => {
         const li = document.createElement('li');
         li.className = 'file-check-item';
         li.dataset.filename = file.name;
@@ -674,7 +670,6 @@ function renderFileList(files) {
             '  <span class="file-check-size">(' + (file.size / 1024 / 1024).toFixed(2) + ' MB)</span>' +
             '</label>';
 
-        // Al click della checkbox, rimuove il file
         const checkbox = li.querySelector('.file-checkbox');
         checkbox.addEventListener('change', () => {
             removeSingleFile(file.name);
@@ -684,27 +679,22 @@ function renderFileList(files) {
     });
 }
 
-// Rimuove un singolo file dall'input
+// Rimuove un singolo file da selectedFiles
 function removeSingleFile(filename) {
-    const fileInput = document.getElementById('audio-file');
-    const dt = new DataTransfer();
-    Array.from(fileInput.files).forEach(f => {
-        if (f.name !== filename) dt.items.add(f);
-    });
-    fileInput.files = dt.files;
+    selectedFiles = selectedFiles.filter(f => f.name !== filename);
 
-    if (fileInput.files.length === 0) {
+    if (selectedFiles.length === 0) {
         clearFileSelection();
     } else {
-        renderFileList(fileInput.files);
+        renderFileList(selectedFiles);
         validateConversionState();
     }
 }
 
 function clearFileSelection() {
+    selectedFiles = [];
     const fileInput = document.getElementById('audio-file');
     fileInput.value = "";
-    // FIX 1: il placeholder (con il btn Scegli File) rimane sempre visibile
     document.getElementById('upload-dropzone').querySelector('.upload-placeholder').classList.remove('hidden');
     document.getElementById('file-list-display').classList.add('hidden');
     document.getElementById('file-list-items').innerHTML = '';
@@ -713,7 +703,7 @@ function clearFileSelection() {
 
 // --- Avvia conversione per tutti i file selezionati ---
 async function startConversion() {
-    const files = Array.from(document.getElementById('audio-file').files);
+    const files = selectedFiles.slice(); // copia
     const outputFormat = document.getElementById('output-format').value;
     if (!files.length) return;
 
@@ -747,7 +737,6 @@ async function startConversion() {
         const jobPromises = files.map(file => convertSingleFile(file, outputFormat, token));
         await Promise.allSettled(jobPromises);
 
-        // Controlla se tutti sono riusciti o meno
         const failed = activeJobs.filter(j => j.status === 'FAILED');
         const succeeded = activeJobs.filter(j => j.status === 'SUCCEEDED');
 
@@ -756,16 +745,22 @@ async function startConversion() {
         if (succeeded.length > 0) {
             document.getElementById('success-state').classList.remove('hidden');
 
-            // FIX 2: bottoni download con testo solo "Scarica"
+            // FIX: un solo bottone "Scarica" che scarica tutti i file in sequenza
             const container = document.getElementById('download-buttons-container');
             container.innerHTML = '';
-            for (const job of succeeded) {
-                const btn = document.createElement('button');
-                btn.className = 'btn-dl btn-dl-file';
-                btn.textContent = '⬇ Scarica';
-                btn.addEventListener('click', () => downloadJobResult(token, job.jobId));
-                container.appendChild(btn);
-            }
+            const btn = document.createElement('button');
+            btn.className = 'btn-dl btn-dl-file';
+            btn.textContent = '⬇ Scarica';
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                for (const job of succeeded) {
+                    await downloadJobResult(token, job.jobId);
+                    // piccola pausa tra download per non sovraccaricare il browser
+                    await new Promise(r => setTimeout(r, 600));
+                }
+                btn.disabled = false;
+            });
+            container.appendChild(btn);
         }
 
         if (failed.length > 0) {
@@ -778,14 +773,11 @@ async function startConversion() {
         document.getElementById('error-state').classList.remove('hidden');
     }
 
-    // FIX 3: dopo la conversione, il bottone "Converti" diventa "Nuova Conversione"
-    // e al click resetta tutto per ricominciare
+    // Dopo la conversione: bottone diventa "Nuova Conversione"
     const convertBtn = document.getElementById('btn-convert');
     convertBtn.disabled = false;
     convertBtn.textContent = 'Nuova Conversione';
-    convertBtn.classList.add('btn-reset-conversion');
 
-    // Rimuovi eventuali listener precedenti e aggiungi quello di reset
     const newBtn = convertBtn.cloneNode(true);
     convertBtn.parentNode.replaceChild(newBtn, convertBtn);
     newBtn.addEventListener('click', resetForNewConversion);
